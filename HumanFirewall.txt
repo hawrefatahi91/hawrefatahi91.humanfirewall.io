@@ -1,0 +1,651 @@
+import React, { useState, useEffect } from 'react';
+import { Shield, Trophy, Home, MessageSquare, Play, RotateCcw, CheckCircle, XCircle, Mail, AlertTriangle } from 'lucide-react';
+
+const HumanFirewall = () => {
+  const [currentPage, setCurrentPage] = useState('welcome');
+  const [quizStarted, setQuizStarted] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [score, setScore] = useState(0);
+  const [answers, setAnswers] = useState([]);
+  const [showResult, setShowResult] = useState(false);
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [playerName, setPlayerName] = useState('');
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+
+  const questions = [
+    {
+      question: "What is a strong password characteristic?",
+      options: [
+        "Using your birthday",
+        "At least 12 characters with mixed case, numbers, and symbols",
+        "Your pet's name",
+        "The word 'password'"
+      ],
+      correct: 1,
+      explanation: "Strong passwords should be long (12+ characters) and include uppercase, lowercase, numbers, and special characters."
+    },
+    {
+      question: "Look at this email. Is this a phishing attempt?",
+      emailImage: true,
+      emailContent: {
+        from: "security@paypa1-verify.com",
+        subject: "URGENT: Verify Your Account Now!",
+        body: "Dear Customer, Your account has been locked due to suspicious activity. Click here immediately to verify your identity or your account will be permanently deleted within 24 hours!"
+      },
+      options: [
+        "No, this is a legitimate email from PayPal",
+        "Yes, this is a phishing email",
+      ],
+      correct: 1,
+      explanation: "This is phishing! Red flags: misspelled domain (paypa1 not paypal), urgency tactics, threatening language, and suspicious 'from' address."
+    },
+    {
+      question: "What is phishing?",
+      options: [
+        "A type of antivirus software",
+        "Fraudulent attempts to obtain sensitive information by pretending to be trustworthy",
+        "A network security protocol",
+        "A type of firewall"
+      ],
+      correct: 1,
+      explanation: "Phishing is a social engineering attack where attackers impersonate legitimate organizations to steal credentials or data."
+    },
+    {
+      question: "Examine this email. Should you trust it?",
+      emailImage: true,
+      emailContent: {
+        from: "noreply@bank-alert-9834.tk",
+        subject: "Your account statement is ready",
+        body: "Hello valued customer, Your monthly statement is now available. Download it here: http://bit.ly/3x9kL2m Login with your credentials to view."
+      },
+      options: [
+        "Yes, it's from my bank",
+        "No, this is suspicious and likely phishing",
+      ],
+      correct: 1,
+      explanation: "Major red flags: suspicious domain (.tk), shortened URL, generic greeting, asking for login credentials through a link."
+    },
+    {
+      question: "What does HTTPS indicate?",
+      options: [
+        "The website is fast",
+        "The website has good design",
+        "The connection is encrypted and secure",
+        "The website is popular"
+      ],
+      correct: 2,
+      explanation: "HTTPS means the connection between your browser and the website is encrypted using SSL/TLS protocols."
+    },
+    {
+      question: "Is this email from IT legitimate?",
+      emailImage: true,
+      emailContent: {
+        from: "IT.Support@company-internal.net",
+        subject: "Password Expiration Notice",
+        body: "Your password will expire in 1 hour. Click this link to reset: http://company-portal-login.xyz/reset Please enter your current password and choose a new one."
+      },
+      options: [
+        "Yes, IT often sends these reminders",
+        "No, this is a phishing attempt",
+      ],
+      correct: 1,
+      explanation: "Phishing! Real IT never asks for current passwords via email, the domain is suspicious (.xyz), and creates false urgency."
+    },
+    {
+      question: "What is two-factor authentication (2FA)?",
+      options: [
+        "Having two passwords",
+        "An extra security layer requiring a second verification method",
+        "Two antivirus programs",
+        "A type of encryption"
+      ],
+      correct: 1,
+      explanation: "2FA adds a second verification step (like a code sent to your phone) beyond just your password."
+    },
+    {
+      question: "What should you do if you receive a suspicious email?",
+      options: [
+        "Click all links to investigate",
+        "Reply asking if it's legitimate",
+        "Don't click links, verify sender independently, report as spam",
+        "Forward it to all contacts"
+      ],
+      correct: 2,
+      explanation: "Never click suspicious links. Verify the sender independently and report phishing attempts to your IT team or email provider."
+    },
+    {
+      question: "Check this prize notification email:",
+      emailImage: true,
+      emailContent: {
+        from: "winner@prize-notification-center.ru",
+        subject: "CONGRATULATIONS! You've Won $10,000!!!",
+        body: "Dear Lucky Winner! You have been randomly selected to receive $10,000! Claim your prize now by providing your bank details and paying a small processing fee of $50."
+      },
+      options: [
+        "Great! I should claim my prize",
+        "This is a scam/phishing email",
+      ],
+      correct: 1,
+      explanation: "Classic scam! Legitimate prizes never require fees, ask for bank details via email, or use random selection without your participation."
+    },
+    {
+      question: "What is ransomware?",
+      options: [
+        "Software that encrypts your files and demands payment",
+        "A type of antivirus",
+        "A cloud storage service",
+        "A password manager"
+      ],
+      correct: 0,
+      explanation: "Ransomware locks or encrypts your data and demands a ransom payment to restore access. Regular backups are your best defense."
+    }
+  ];
+
+  useEffect(() => {
+    loadLeaderboard();
+  }, []);
+
+  const loadLeaderboard = async () => {
+    try {
+      const result = await window.storage.list('hf-score:', true);
+      if (result && result.keys) {
+        const scores = await Promise.all(
+          result.keys.map(async (key) => {
+            const data = await window.storage.get(key, true);
+            return data ? JSON.parse(data.value) : null;
+          })
+        );
+        const validScores = scores.filter(s => s !== null);
+        validScores.sort((a, b) => b.score - a.score);
+        setLeaderboard(validScores.slice(0, 10));
+      }
+    } catch (error) {
+      console.log('Loading leaderboard...');
+      setLeaderboard([]);
+    }
+  };
+
+  const handleAnswer = (selectedIndex) => {
+    const isCorrect = selectedIndex === questions[currentQuestion].correct;
+    const newAnswers = [...answers, { questionIndex: currentQuestion, selectedIndex, isCorrect }];
+    setAnswers(newAnswers);
+
+    if (isCorrect) {
+      setScore(score + 1);
+    }
+
+    setShowResult(true);
+  };
+
+  const nextQuestion = () => {
+    setShowResult(false);
+    if (currentQuestion < questions.length - 1) {
+      setCurrentQuestion(currentQuestion + 1);
+    } else {
+      finishQuiz();
+    }
+  };
+
+  const finishQuiz = async () => {
+    if (playerName.trim()) {
+      try {
+        const scoreData = {
+          name: playerName,
+          score: score + 1,
+          total: questions.length,
+          percentage: Math.round(((score + 1) / questions.length) * 100),
+          date: new Date().toISOString()
+        };
+        
+        const timestamp = Date.now();
+        await window.storage.set(`hf-score:${timestamp}`, JSON.stringify(scoreData), true);
+        await loadLeaderboard();
+      } catch (error) {
+        console.error('Failed to save score:', error);
+      }
+    }
+    setQuizStarted(false);
+    setShowLeaderboard(true);
+  };
+
+  const resetQuiz = () => {
+    setCurrentQuestion(0);
+    setScore(0);
+    setAnswers([]);
+    setShowResult(false);
+    setQuizStarted(false);
+    setShowLeaderboard(false);
+  };
+
+  const startQuiz = () => {
+    if (playerName.trim()) {
+      setQuizStarted(true);
+      setShowLeaderboard(false);
+    }
+  };
+
+  // Navigation Component
+  const Navigation = () => (
+    <nav className="bg-slate-800/50 backdrop-blur-md border-b border-purple-500/30">
+      <div className="max-w-6xl mx-auto px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Shield className="w-8 h-8 text-purple-400" />
+            <span className="text-2xl font-bold text-white">HumanFirewall</span>
+          </div>
+          <div className="flex gap-4">
+            <button
+              onClick={() => { setCurrentPage('home'); setQuizStarted(false); setShowLeaderboard(false); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+                currentPage === 'home' ? 'bg-purple-600 text-white' : 'text-purple-200 hover:bg-white/10'
+              }`}
+            >
+              <Home className="w-5 h-5" />
+              Home
+            </button>
+            <button
+              onClick={() => { setCurrentPage('quiz'); setQuizStarted(false); setShowLeaderboard(false); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+                currentPage === 'quiz' ? 'bg-purple-600 text-white' : 'text-purple-200 hover:bg-white/10'
+              }`}
+            >
+              <Trophy className="w-5 h-5" />
+              Quiz
+            </button>
+            <button
+              onClick={() => { setCurrentPage('contact'); setQuizStarted(false); setShowLeaderboard(false); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition ${
+                currentPage === 'contact' ? 'bg-purple-600 text-white' : 'text-purple-200 hover:bg-white/10'
+              }`}
+            >
+              <MessageSquare className="w-5 h-5" />
+              Contact
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+
+  // Welcome Page
+  if (currentPage === 'welcome') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        <div className="flex items-center justify-center min-h-screen p-6">
+          <div className="max-w-3xl text-center">
+            <Shield className="w-32 h-32 text-purple-400 mx-auto mb-6 animate-pulse" />
+            <h1 className="text-6xl font-bold text-white mb-4">HumanFirewall</h1>
+            <h2 className="text-3xl text-purple-300 mb-6">Welcome to Cybersecurity Awareness</h2>
+            <p className="text-xl text-purple-100 mb-8 leading-relaxed">
+              Empower yourself with knowledge to defend against cyber threats. 
+              Learn to identify phishing attempts, protect your data, and become 
+              your organization's first line of defense.
+            </p>
+            <button
+              onClick={() => setCurrentPage('home')}
+              className="bg-purple-600 hover:bg-purple-700 text-white text-xl font-semibold py-4 px-12 rounded-lg transition transform hover:scale-105"
+            >
+              Enter
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Home Page
+  if (currentPage === 'home') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        <Navigation />
+        <div className="max-w-4xl mx-auto p-8">
+          <div className="text-center mb-12">
+            <h1 className="text-5xl font-bold text-white mb-4">What is HumanFirewall?</h1>
+            <div className="w-24 h-1 bg-purple-500 mx-auto mb-8"></div>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur-md rounded-lg p-8 mb-6">
+            <h2 className="text-2xl font-semibold text-white mb-4 flex items-center gap-2">
+              <Shield className="w-7 h-7 text-purple-400" />
+              Our Mission
+            </h2>
+            <p className="text-purple-100 text-lg leading-relaxed mb-4">
+              HumanFirewall is dedicated to building cybersecurity awareness and empowering individuals 
+              to recognize and defend against digital threats. In today's connected world, every person 
+              is a potential target for cyberattacks.
+            </p>
+            <p className="text-purple-100 text-lg leading-relaxed">
+              We believe that educated users are the strongest defense against cybercrime. Through 
+              interactive training and real-world examples, we help you become a "human firewall" 
+              for your organization and personal life.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6 mb-6">
+            <div className="bg-white/10 backdrop-blur-md rounded-lg p-6">
+              <h3 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
+                <AlertTriangle className="w-6 h-6 text-yellow-400" />
+                What We Help You With
+              </h3>
+              <ul className="text-purple-100 space-y-2">
+                <li>• Identifying phishing emails and scams</li>
+                <li>• Creating strong passwords and using 2FA</li>
+                <li>• Recognizing social engineering tactics</li>
+                <li>• Safe browsing and email practices</li>
+                <li>• Protecting sensitive information</li>
+                <li>• Responding to security incidents</li>
+              </ul>
+            </div>
+
+            <div className="bg-white/10 backdrop-blur-md rounded-lg p-6">
+              <h3 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
+                <Trophy className="w-6 h-6 text-purple-400" />
+                How We Help
+              </h3>
+              <ul className="text-purple-100 space-y-2">
+                <li>• Interactive quizzes with real examples</li>
+                <li>• Detailed explanations for each question</li>
+                <li>• Recognition of phishing email patterns</li>
+                <li>• Best practices and security tips</li>
+                <li>• Track your progress and improvement</li>
+                <li>• Learn at your own pace</li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg p-8 text-center">
+            <h3 className="text-2xl font-bold text-white mb-3">Ready to Test Your Skills?</h3>
+            <p className="text-white/90 mb-6">Take our cybersecurity quiz and see how well you can spot threats!</p>
+            <button
+              onClick={() => setCurrentPage('quiz')}
+              className="bg-white text-purple-600 hover:bg-purple-50 font-semibold py-3 px-8 rounded-lg transition transform hover:scale-105"
+            >
+              Start Quiz Now
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Contact Page
+  if (currentPage === 'contact') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        <Navigation />
+        <div className="max-w-3xl mx-auto p-8">
+          <div className="text-center mb-12">
+            <h1 className="text-5xl font-bold text-white mb-4">Contact Us</h1>
+            <div className="w-24 h-1 bg-purple-500 mx-auto mb-8"></div>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur-md rounded-lg p-8 mb-6">
+            <h2 className="text-2xl font-semibold text-white mb-6">Have Questions?</h2>
+            <p className="text-purple-100 text-lg mb-8">
+              We're here to help you strengthen your cybersecurity knowledge. 
+              Reach out to us with any questions or feedback!
+            </p>
+
+            <div className="space-y-6">
+              <div className="flex items-start gap-4">
+                <Mail className="w-6 h-6 text-purple-400 mt-1" />
+                <div>
+                  <h3 className="text-white font-semibold mb-1">Email</h3>
+                  <a href="mailto:info@humanfirewall.com" className="text-purple-300 hover:text-purple-200">
+                    info@humanfirewall.com
+                  </a>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <MessageSquare className="w-6 h-6 text-purple-400 mt-1" />
+                <div>
+                  <h3 className="text-white font-semibold mb-1">Support</h3>
+                  <a href="mailto:support@humanfirewall.com" className="text-purple-300 hover:text-purple-200">
+                    support@humanfirewall.com
+                  </a>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-4">
+                <Shield className="w-6 h-6 text-purple-400 mt-1" />
+                <div>
+                  <h3 className="text-white font-semibold mb-1">Security Questions</h3>
+                  <a href="mailto:security@humanfirewall.com" className="text-purple-300 hover:text-purple-200">
+                    security@humanfirewall.com
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur-md rounded-lg p-8">
+            <h2 className="text-2xl font-semibold text-white mb-4">Report a Phishing Attempt</h2>
+            <p className="text-purple-100 mb-4">
+              If you've received a suspicious email or encountered a potential phishing attempt, 
+              please forward it to us so we can help protect others.
+            </p>
+            <a 
+              href="mailto:phishing@humanfirewall.com" 
+              className="inline-block bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-6 rounded-lg transition"
+            >
+              Report Phishing
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Quiz Page
+  if (currentPage === 'quiz') {
+    // Quiz Start Screen
+    if (!quizStarted && !showLeaderboard) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+          <Navigation />
+          <div className="max-w-2xl mx-auto p-8">
+            <div className="text-center mb-8">
+              <Trophy className="w-20 h-20 text-purple-400 mx-auto mb-4" />
+              <h1 className="text-4xl font-bold text-white mb-2">Cybersecurity Quiz</h1>
+              <p className="text-purple-200">Test your knowledge and learn to identify threats</p>
+            </div>
+
+            <div className="bg-white/10 backdrop-blur-md rounded-lg p-8 mb-6">
+              <h2 className="text-2xl font-semibold text-white mb-4">Get Started</h2>
+              <p className="text-purple-100 mb-6">
+                Answer {questions.length} questions about cybersecurity. You'll see real phishing 
+                email examples and learn how to spot threats. Each question includes an explanation!
+              </p>
+              
+              <input
+                type="text"
+                placeholder="Enter your name"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg bg-white/20 border border-purple-300/30 text-white placeholder-purple-200 mb-4 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                onKeyPress={(e) => e.key === 'Enter' && startQuiz()}
+              />
+              
+              <button
+                onClick={startQuiz}
+                disabled={!playerName.trim()}
+                className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition flex items-center justify-center gap-2"
+              >
+                <Play className="w-5 h-5" />
+                Start Quiz
+              </button>
+            </div>
+
+            {leaderboard.length > 0 && (
+              <div className="bg-white/10 backdrop-blur-md rounded-lg p-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <Trophy className="w-6 h-6 text-yellow-400" />
+                  <h2 className="text-2xl font-semibold text-white">Top Scores</h2>
+                </div>
+                <div className="space-y-2">
+                  {leaderboard.map((entry, index) => (
+                    <div key={index} className="flex items-center justify-between bg-white/5 rounded p-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl font-bold text-purple-400">#{index + 1}</span>
+                        <span className="text-white font-medium">{entry.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-white font-semibold">{entry.score}/{entry.total}</div>
+                        <div className="text-purple-300 text-sm">{entry.percentage}%</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // Quiz Results Screen
+    if (showLeaderboard) {
+      const percentage = Math.round((score / questions.length) * 100);
+      
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+          <Navigation />
+          <div className="max-w-2xl mx-auto p-8">
+            <div className="bg-white/10 backdrop-blur-md rounded-lg p-8 text-center mb-6">
+              <Trophy className="w-20 h-20 text-yellow-400 mx-auto mb-4" />
+              <h1 className="text-4xl font-bold text-white mb-2">Quiz Complete!</h1>
+              <p className="text-purple-200 mb-6">Great job, {playerName}!</p>
+              
+              <div className="bg-white/10 rounded-lg p-6 mb-6">
+                <div className="text-6xl font-bold text-white mb-2">{score}/{questions.length}</div>
+                <div className="text-2xl text-purple-300">{percentage}% Correct</div>
+              </div>
+
+              <div className="mb-6">
+                <h3 className="text-xl font-semibold text-white mb-3">Your Performance:</h3>
+                <p className="text-purple-100">
+                  {percentage >= 80 && "Excellent! You have a strong understanding of cybersecurity basics."}
+                  {percentage >= 60 && percentage < 80 && "Good job! Keep learning to strengthen your cybersecurity knowledge."}
+                  {percentage >= 40 && percentage < 60 && "Nice try! Review the explanations to improve your understanding."}
+                  {percentage < 40 && "Keep practicing! Cybersecurity is important, and you'll get better with time."}
+                </p>
+              </div>
+
+              <button
+                onClick={resetQuiz}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-8 rounded-lg transition flex items-center justify-center gap-2 mx-auto"
+              >
+                <RotateCcw className="w-5 h-5" />
+                Take Quiz Again
+              </button>
+            </div>
+
+            <div className="bg-white/10 backdrop-blur-md rounded-lg p-8">
+              <div className="flex items-center gap-2 mb-4">
+                <Trophy className="w-6 h-6 text-yellow-400" />
+                <h2 className="text-2xl font-semibold text-white">Leaderboard</h2>
+              </div>
+              <div className="space-y-2">
+                {leaderboard.map((entry, index) => (
+                  <div key={index} className="flex items-center justify-between bg-white/5 rounded p-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl font-bold text-purple-400">#{index + 1}</span>
+                      <span className="text-white font-medium">{entry.name}</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-white font-semibold">{entry.score}/{entry.total}</div>
+                      <div className="text-purple-300 text-sm">{entry.percentage}%</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Quiz Questions
+    const q = questions[currentQuestion];
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        <Navigation />
+        <div className="max-w-3xl mx-auto p-8">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="text-purple-200">
+              Question {currentQuestion + 1} of {questions.length}
+            </div>
+            <div className="text-white font-semibold">
+              Score: {score}/{currentQuestion}
+            </div>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur-md rounded-lg p-8">
+            <h2 className="text-2xl font-semibold text-white mb-6">{q.question}</h2>
+            
+            {q.emailImage && (
+              <div className="mb-6 bg-white rounded-lg p-4 border-2 border-gray-300">
+                <div className="flex items-center gap-2 mb-3 pb-3 border-b border-gray-300">
+                  <Mail className="w-5 h-5 text-gray-600" />
+                  <span className="font-semibold text-gray-800">Email Preview</span>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div><span className="font-semibold text-gray-700">From:</span> <span className="text-gray-900">{q.emailContent.from}</span></div>
+                  <div><span className="font-semibold text-gray-700">Subject:</span> <span className="text-gray-900">{q.emailContent.subject}</span></div>
+                  <div className="pt-3 border-t border-gray-200">
+                    <p className="text-gray-900 leading-relaxed">{q.emailContent.body}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="space-y-3 mb-6">
+              {q.options.map((option, index) => (
+                <button
+                  key={index}
+                  onClick={() => !showResult && handleAnswer(index)}
+                  disabled={showResult}
+                  className={`w-full p-4 rounded-lg text-left transition ${
+                    showResult
+                      ? index === q.correct
+                        ? 'bg-green-600 text-white'
+                        : answers[answers.length - 1]?.selectedIndex === index
+                        ? 'bg-red-600 text-white'
+                        : 'bg-white/5 text-purple-100'
+                      : 'bg-white/20 hover:bg-white/30 text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    {showResult && index === q.correct && <CheckCircle className="w-5 h-5" />}
+                    {showResult && answers[answers.length - 1]?.selectedIndex === index && index !== q.correct && <XCircle className="w-5 h-5" />}
+                    <span>{option}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {showResult && (
+              <div className="bg-white/10 rounded-lg p-4 mb-4">
+                <h3 className="font-semibold text-white mb-2">Explanation:</h3>
+                <p className="text-purple-100">{q.explanation}</p>
+              </div>
+            )}
+
+            {showResult && (
+              <button
+                onClick={nextQuestion}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition"
+              >
+                {currentQuestion < questions.length - 1 ? 'Next Question' : 'View Results'}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+};
+
+export default HumanFirewall;
